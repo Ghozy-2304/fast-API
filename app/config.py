@@ -9,7 +9,10 @@ class Settings(BaseSettings):
     debug: bool = Field(True, alias="DEBUG")
     port: int = Field(8000, alias="PORT")
     
-    allowed_origins_raw: str = Field("http://localhost:3000,http://localhost:8000,http://127.0.0.1:8000", alias="ALLOWED_ORIGINS")
+    allowed_origins_raw: str = Field(
+        "http://localhost:3000,http://localhost:8000,http://127.0.0.1:8000,http://localhost:5173,https://jhic-20-production.up.railway.app",
+        alias="ALLOWED_ORIGINS"
+    )
     internal_api_key: Optional[str] = Field(None, alias="INTERNAL_API_KEY")
     
     # OpenAI Credentials & Config (Responses API)
@@ -27,6 +30,14 @@ class Settings(BaseSettings):
     def allowed_origins(self) -> List[str]:
         if not self.allowed_origins_raw:
             return ["*"] if self.app_env != "production" else []
-        return [origin.strip() for origin in self.allowed_origins_raw.split(",") if origin.strip()]
+        origins = []
+        for origin in self.allowed_origins_raw.split(","):
+            cleaned = origin.strip()
+            if not cleaned:
+                continue
+            normalized = cleaned.rstrip("/") if cleaned != "*" else "*"
+            if normalized not in origins:
+                origins.append(normalized)
+        return origins
 
 settings = Settings()

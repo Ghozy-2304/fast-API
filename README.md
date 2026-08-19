@@ -85,7 +85,7 @@ fastapi-chatbot-backend/
    APP_NAME="FastAPI AI Chatbot"
    APP_ENV="development"
    PORT=8000
-   ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:8000"
+   ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:8000,https://jhic-20-production.up.railway.app"
 
    # Kunci keamanan internal untuk mengakses endpoint API
    INTERNAL_API_KEY="secret-internal-api-key-2026"
