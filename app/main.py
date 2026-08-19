@@ -40,7 +40,7 @@ async def verify_api_key(api_key: str = Security(api_key_header)):
 allowed_origins = settings.allowed_origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=["https://jhic-20-production.up.railway.app"],
     allow_credentials=True if "*" not in allowed_origins else False,
     allow_methods=["*"],
     allow_headers=["*"],
