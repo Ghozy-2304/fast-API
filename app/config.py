@@ -18,7 +18,25 @@ class Settings(BaseSettings):
     # OpenAI Credentials & Config (Responses API)
     openai_api_key: str = Field("sk-your-openai-api-key-here", alias="OPENAI_API_KEY")
     openai_model: str = Field("gpt-5.5", alias="OPENAI_MODEL") # Gunakan model terbaru yang mendukung Responses API (gpt-4o, gpt-5.5, dll)
-    openai_system_instructions: str = Field("You are a helpful and polite AI assistant.", alias="OPENAI_SYSTEM_INSTRUCTIONS")
+    openai_system_instruction_file: Optional[str] = Field("system_instructions.txt", alias="OPENAI_SYSTEM_INSTRUCTION_FILE")
+    openai_system_instructions_raw: Optional[str] = Field(None, alias="OPENAI_SYSTEM_INSTRUCTIONS")
+
+    @property
+    def openai_system_instructions(self) -> str:
+        file_path = self.openai_system_instruction_file
+        if file_path and os.path.exists(file_path):
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+                    if content:
+                        return content
+            except Exception:
+                pass
+        
+        if self.openai_system_instructions_raw and self.openai_system_instructions_raw.strip():
+            return self.openai_system_instructions_raw.strip()
+            
+        return "You are a helpful and polite AI assistant."
 
     model_config = SettingsConfigDict(
         env_file=".env",

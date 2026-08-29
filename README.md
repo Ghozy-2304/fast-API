@@ -27,6 +27,7 @@ fastapi-chatbot-backend/
 │   └── schemas.py       # Validasi struktur data request dan response
 ├── frontend/
 │   └── index.html       # Antarmuka pengujian chatbot (Floating UI Widget)
+├── system_instructions.txt # Berkas teks instruksi sistem AI & knowledge base
 ├── .env.example         # Templat variabel lingkungan untuk konfigurasi lokal
 ├── .gitignore           # Daftar berkas yang diabaikan oleh Git
 ├── Procfile             # Instruksi deployment cloud (Render, Railway, Heroku)
@@ -93,7 +94,7 @@ fastapi-chatbot-backend/
    # Kunci dan konfigurasi OpenAI
    OPENAI_API_KEY="sk-xxxx-api-key-openai-anda"
    OPENAI_MODEL="gpt-5.5"
-   OPENAI_SYSTEM_INSTRUCTIONS="Kamu adalah Asisten AI yang ramah, profesional, dan informatif. Tugasmu adalah membantu menjawab pertanyaan pengguna dengan jelas dan akurat."
+   OPENAI_SYSTEM_INSTRUCTION_FILE="system_instructions.txt"
    ```
 
 ---
