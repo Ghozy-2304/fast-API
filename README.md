@@ -27,7 +27,6 @@ fastapi-chatbot-backend/
 │   └── schemas.py       # Validasi struktur data request dan response
 ├── frontend/
 │   └── index.html       # Antarmuka pengujian chatbot (Floating UI Widget)
-├── system_instructions.txt # Berkas teks instruksi sistem AI & knowledge base
 ├── .env.example         # Templat variabel lingkungan untuk konfigurasi lokal
 ├── .gitignore           # Daftar berkas yang diabaikan oleh Git
 ├── Procfile             # Instruksi deployment cloud (Render, Railway, Heroku)
@@ -48,6 +47,7 @@ fastapi-chatbot-backend/
 ## Instalasi dan Konfigurasi Lokal
 
 1. **Klona Repositori dan Masuk ke Direktori Proyek**
+
    ```bash
    git clone https://github.com/fardanhafidz/fastapi-chatbot-backend
    cd fastapi-chatbot-backend
@@ -66,6 +66,7 @@ fastapi-chatbot-backend/
      ```
 
 3. **Install Dependensi Library**
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -82,6 +83,7 @@ fastapi-chatbot-backend/
      ```
 
    Buka berkas `.env` di editor teks Anda dan sesuaikan nilai parameter berikut:
+
    ```ini
    APP_NAME="FastAPI AI Chatbot"
    APP_ENV="development"
@@ -94,7 +96,7 @@ fastapi-chatbot-backend/
    # Kunci dan konfigurasi OpenAI
    OPENAI_API_KEY="sk-xxxx-api-key-openai-anda"
    OPENAI_MODEL="gpt-5.5"
-   OPENAI_SYSTEM_INSTRUCTION_FILE="system_instructions.txt"
+   OPENAI_SYSTEM_INSTRUCTIONS="Kamu adalah Asisten AI yang ramah, profesional, dan informatif. Tugasmu adalah membantu menjawab pertanyaan pengguna dengan jelas dan akurat."
    ```
 
 ---
@@ -114,18 +116,24 @@ Server akan aktif pada alamat: `http://127.0.0.1:8000`
 ## Cara Pengujian
 
 ### 1. Pengujian Antarmuka Obrolan (Frontend Demo)
+
 Buka web browser dan akses URL berikut untuk mencoba widget obrolan secara langsung:
+
 - URL: `http://127.0.0.1:8000/demo` (atau `http://127.0.0.1:8000/chat`)
 
 ### 2. Pengujian via Dokumentasi Swagger UI
+
 Akses halaman dokumentasi interaktif pada browser:
+
 - URL: `http://127.0.0.1:8000/docs`
 - Klik tombol **Authorize** di sudut kanan atas.
 - Masukkan nilai `INTERNAL_API_KEY` (contoh: `secret-internal-api-key-2026`).
 - Klik **Authorize**, lalu **Close**. Anda kini dapat menguji endpoint `/api/v1/chat` dan `/api/v1/conversations` secara langsung dari Swagger.
 
 ### 3. Pengujian via cURL (Terminal / Command Prompt)
+
 Contoh pengiriman pesan ke obrolan menggunakan cURL:
+
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/chat \
      -H "Content-Type: application/json" \
@@ -137,12 +145,12 @@ curl -X POST http://127.0.0.1:8000/api/v1/chat \
 
 ## Daftar Endpoint API
 
-| Metode | Rute | Deskripsi | Batas Laju (Rate Limit) | Auth Wajib |
-| :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/` | Pemeriksaan kesehatan sistem (Health Check) | - | Tidak |
-| `GET` | `/demo` | Antarmuka pengujian frontend chatbot | - | Tidak |
-| `POST` | `/api/v1/conversations` | Inisialisasi ID sesi percakapan baru | 15 / menit | Ya (`X-API-Key`) |
-| `POST` | `/api/v1/chat` | Mengirim pesan ke AI dan menerima jawaban obrolan | 20 / menit | Ya (`X-API-Key`) |
+| Metode | Rute                    | Deskripsi                                         | Batas Laju (Rate Limit) | Auth Wajib       |
+| :----- | :---------------------- | :------------------------------------------------ | :---------------------- | :--------------- |
+| `GET`  | `/`                     | Pemeriksaan kesehatan sistem (Health Check)       | -                       | Tidak            |
+| `GET`  | `/demo`                 | Antarmuka pengujian frontend chatbot              | -                       | Tidak            |
+| `POST` | `/api/v1/conversations` | Inisialisasi ID sesi percakapan baru              | 15 / menit              | Ya (`X-API-Key`) |
+| `POST` | `/api/v1/chat`          | Mengirim pesan ke AI dan menerima jawaban obrolan | 20 / menit              | Ya (`X-API-Key`) |
 
 ---
 
@@ -151,6 +159,7 @@ curl -X POST http://127.0.0.1:8000/api/v1/chat \
 Proyek ini telah dilengkapi dengan berkas `Procfile` sehingga kompatibel untuk langsung di-deploy ke platform cloud seperti Render, Railway, Heroku, atau Fly.io.
 
 Perhatikan poin berikut sebelum melakukan deployment produksi:
+
 1. Atur variabel lingkungan (Environment Variables) pada dasbor cloud provider Anda dengan nilai dari `.env`.
 2. Ubah `APP_ENV` menjadi `production` dan `DEBUG` menjadi `False`.
 3. Sesuaikan parameter `ALLOWED_ORIGINS` hanya dengan nama domain resmi situs web antarmuka Anda, jangan gunakan wildcard (`*`) atau localhost.

@@ -15,15 +15,20 @@ class Settings(BaseSettings):
     )
     internal_api_key: Optional[str] = Field(None, alias="INTERNAL_API_KEY")
     
-    # OpenAI Credentials & Config (Responses API)
-    openai_api_key: str = Field("sk-your-openai-api-key-here", alias="OPENAI_API_KEY")
-    openai_model: str = Field("gpt-5.5", alias="OPENAI_MODEL") # Gunakan model terbaru yang mendukung Responses API (gpt-4o, gpt-5.5, dll)
-    openai_system_instruction_file: Optional[str] = Field("system_instructions.txt", alias="OPENAI_SYSTEM_INSTRUCTION_FILE")
-    openai_system_instructions_raw: Optional[str] = Field(None, alias="OPENAI_SYSTEM_INSTRUCTIONS")
+    # Google Gemini Credentials & Config
+    gemini_api_key: str = Field("", alias="GEMINI_API_KEY")
+    gemini_model: str = Field("gemini-3.6-flash", alias="GEMINI_MODEL")
+    gemini_system_instruction_file: str = Field("system_instructions.txt", alias="GEMINI_SYSTEM_INSTRUCTION_FILE")
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
 
     @property
-    def openai_system_instructions(self) -> str:
-        file_path = self.openai_system_instruction_file
+    def system_instructions(self) -> str:
+        file_path = self.gemini_system_instruction_file
         if file_path and os.path.exists(file_path):
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
@@ -32,17 +37,7 @@ class Settings(BaseSettings):
                         return content
             except Exception:
                 pass
-        
-        if self.openai_system_instructions_raw and self.openai_system_instructions_raw.strip():
-            return self.openai_system_instructions_raw.strip()
-            
         return "You are a helpful and polite AI assistant."
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore"
-    )
 
     @property
     def allowed_origins(self) -> List[str]:

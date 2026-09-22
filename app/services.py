@@ -1,27 +1,33 @@
 import logging
-from typing import Tuple, Optional
-from openai import AsyncOpenAI, OpenAIError, RateLimitError, AuthenticationError, NotFoundError, BadRequestError
+import uuid
+import asyncio
+from typing import Tuple, Optional, Dict, List
+from google import genai
+from google.genai import types
 from app.config import settings
 
 logger = logging.getLogger("api.services")
 
-class OpenAIService:
-    def __init__(self, client: Optional[AsyncOpenAI] = None):
-        # Client diinjeksi saat request agar aman dari event loop terputus
-        self.client = client or AsyncOpenAI(api_key=settings.openai_api_key)
-        self.model = settings.openai_model
-        self.instructions = settings.openai_system_instructions
+# In-memory session store untuk menyimpan riwayat percakapan per conversation_id
+_conversations_store: Dict[str, List[types.Content]] = {}
+
+class GeminiService:
+    def __init__(self, client: Optional[genai.Client] = None):
+        self.client = client or genai.Client(api_key=settings.gemini_api_key)
+        self.model = settings.gemini_model
+        self.instructions = settings.system_instructions
 
     async def create_conversation(self) -> str:
         """
-        Membuat sesi percakapan baru di server OpenAI (Conversations API).
+        Membuat sesi percakapan baru untuk Gemini.
         """
         try:
-            conversation = await self.client.conversations.create()
-            logger.info(f"Berhasil membuat conversation baru: {conversation.id}")
-            return conversation.id
+            conv_id = f"conv_{uuid.uuid4().hex[:16]}"
+            _conversations_store[conv_id] = []
+            logger.info(f"Berhasil membuat conversation baru: {conv_id}")
+            return conv_id
         except Exception as e:
-            logger.error(f"Error saat membuat conversation OpenAI: {str(e)}")
+            logger.error(f"Error saat membuat conversation Gemini: {str(e)}")
             raise e
 
     async def chat_with_ai(
@@ -31,51 +37,74 @@ class OpenAIService:
         previous_response_id: Optional[str] = None
     ) -> Tuple[str, str, Optional[str]]:
         """
-        Mengirim pesan menggunakan OpenAI Responses API terbaru.
-        Tidak memerlukan polling (create_and_poll) dan langsung mengembalikan output_text!
+        Mengirim pesan menggunakan Google Gemini API.
+        Mempertahankan riwayat obrolan berbasis conversation_id.
         """
         try:
-            # Siapkan parameter request
-            params = {
-                "model": self.model,
-                "input": message,
-                "instructions": self.instructions,
-                "store": True  # PENTING: agar riwayat percakapan disimpan oleh OpenAI
-            }
+            if not conversation_id:
+                conversation_id = await self.create_conversation()
+            elif conversation_id not in _conversations_store:
+                _conversations_store[conversation_id] = []
 
-            # Gunakan conversation_id jika tersedia, atau previous_response_id
-            if conversation_id:
-                params["conversation"] = conversation_id
-            elif previous_response_id:
-                params["previous_response_id"] = previous_response_id
+            history = _conversations_store[conversation_id]
 
-            # Satu pemanggilan API yang cepat & bersih (tanpa polling)
-            response = await self.client.responses.create(**params)
-            
-            logger.info(f"Response {response.id} berhasil dibuat.")
-            
-            output_text = response.output_text or ""
+            # Susun daftar pesan (history + pesan baru)
+            contents = list(history)
+            contents.append(
+                types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=message)]
+                )
+            )
+
+            config = types.GenerateContentConfig(
+                system_instruction=self.instructions,
+            )
+
+            # Eksekusi request generate_content ke Gemini
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: self.client.models.generate_content(
+                    model=self.model,
+                    contents=contents,
+                    config=config
+                )
+            )
+
+            output_text = response.text or ""
             if not output_text.strip():
-                raise RuntimeError("AI selesai memproses namun tidak mengembalikan jawaban teks.")
+                raise RuntimeError("Gemini AI memproses permintaan tetapi tidak mengembalikan teks jawaban.")
 
-            return output_text.strip(), response.id, conversation_id
+            # Perbarui riwayat di memori
+            history.append(
+                types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=message)]
+                )
+            )
+            history.append(
+                types.Content(
+                    role="model",
+                    parts=[types.Part.from_text(text=output_text.strip())]
+                )
+            )
+            _conversations_store[conversation_id] = history
 
-        except NotFoundError as e:
-            logger.error(f"Resource tidak ditemukan (Conversation ID / Response ID salah): {str(e)}")
-            raise e
-        except BadRequestError as e:
-            logger.error(f"Bad Request ke OpenAI: {str(e)}")
-            raise e
-        except RateLimitError as e:
-            logger.error(f"Rate limit exceeded: {str(e)}")
-            raise e
-        except AuthenticationError as e:
-            logger.error("Authentication error: Periksa OPENAI_API_KEY")
-            raise e
-        except OpenAIError as e:
-            logger.error(f"OpenAI API Error: {str(e)}")
+            response_id = f"resp_{uuid.uuid4().hex[:16]}"
+            logger.info(f"Response {response_id} berhasil dibuat untuk conversation {conversation_id}.")
+
+            return output_text.strip(), response_id, conversation_id
+
+        except Exception as e:
+            logger.error(f"Error saat komunikasi dengan Gemini API: {str(e)}")
             raise e
 
 # Dependency provider untuk FastAPI
-def get_openai_service() -> OpenAIService:
-    return OpenAIService()
+def get_gemini_service() -> GeminiService:
+    return GeminiService()
+
+# Backward compatibility alias
+OpenAIService = GeminiService
+get_openai_service = get_gemini_service
+
