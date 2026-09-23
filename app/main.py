@@ -10,7 +10,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.schemas import ChatRequest, ChatResponse, ConversationCreateResponse, HealthResponse
-from app.services import GeminiService, get_gemini_service
+from app.services import OpenRouterService, get_openrouter_service
 
 logger = logging.getLogger("api.main")
 
@@ -19,8 +19,8 @@ limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title=settings.app_name,
-    description="Backend API untuk Chatbot AI berbasis FastAPI dan Google Gemini API",
-    version="2.1.0-gemini",
+    description="Backend API untuk Chatbot AI berbasis FastAPI dan OpenRouter (Gemini 3.8 Flash)",
+    version="2.2.0-openrouter",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -53,7 +53,7 @@ async def health_check():
         status="ok",
         app_name=settings.app_name,
         environment=settings.app_env,
-        version="2.1.0-gemini"
+        version="2.2.0-openrouter"
     )
 
 @app.get("/demo", include_in_schema=False)
@@ -70,7 +70,7 @@ async def serve_demo_page():
 
 @app.post("/api/v1/conversations", response_model=ConversationCreateResponse, status_code=status.HTTP_201_CREATED, tags=["Conversations"], dependencies=[Depends(verify_api_key)])
 @limiter.limit("15/minute")
-async def create_new_conversation(request: Request, service: GeminiService = Depends(get_gemini_service)):
+async def create_new_conversation(request: Request, service: OpenRouterService = Depends(get_openrouter_service)):
     """
     Endpoint untuk membuat sesi conversation baru.
     """
@@ -89,10 +89,10 @@ async def create_new_conversation(request: Request, service: GeminiService = Dep
 async def chat_endpoint(
     request: Request,
     payload: ChatRequest, 
-    service: GeminiService = Depends(get_gemini_service)
+    service: OpenRouterService = Depends(get_openrouter_service)
 ):
     """
-    Endpoint utama berinteraksi dengan AI menggunakan Google Gemini API.
+    Endpoint utama berinteraksi dengan AI menggunakan OpenRouter API.
     """
     try:
         output_text, response_id, conv_id = await service.chat_with_ai(
@@ -105,9 +105,11 @@ async def chat_endpoint(
             response_id=response_id,
             conversation_id=conv_id
         )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
     except Exception as e:
         logger.error(f"Unhandled error in chat endpoint: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Kesalahan pada layanan AI Gemini: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Kesalahan pada layanan OpenRouter AI: {str(e)}")
 
