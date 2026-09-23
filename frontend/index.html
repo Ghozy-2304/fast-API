@@ -478,7 +478,7 @@
             }
         });
 
-        // Send Message to FastAPI Backend
+        // Send Message to FastAPI Backend (Streaming kata per kata)
         async function sendMessage() {
             const text = userInput.value.trim();
             if (!text || isWaitingResponse) return;
@@ -495,7 +495,7 @@
             scrollToBottom();
 
             try {
-                // Step 1 (Opsional): Jika belum ada activeConversationId, inisialisasi sesi ke /api/v1/conversations
+                // Ensure conversation session exists
                 if (!activeConversationId) {
                     try {
                         const initRes = await fetch(`${BASE_URL}/api/v1/conversations`, {
@@ -510,22 +510,15 @@
                             activeConversationId = initData.conversation_id;
                         }
                     } catch (err) {
-                        console.warn("Gagal inisialisasi sesi, melanjutkan dengan response chaining standar:", err);
+                        console.warn("Gagal inisialisasi sesi:", err);
                     }
                 }
 
-                // Step 2: Kirim obrolan ke /api/v1/chat
-                const payload = {
-                    message: text
-                };
-                if (activeConversationId) {
-                    payload.conversation_id = activeConversationId;
-                }
-                if (activeResponseId) {
-                    payload.previous_response_id = activeResponseId;
-                }
+                const payload = { message: text };
+                if (activeConversationId) payload.conversation_id = activeConversationId;
 
-                const response = await fetch(`${BASE_URL}/api/v1/chat`, {
+                // Send request to /api/v1/chat/stream
+                const response = await fetch(`${BASE_URL}/api/v1/chat/stream`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -544,26 +537,42 @@
                     } catch (e) {}
 
                     if (response.status === 401) {
-                        appendMessage("error", `<b>Akses Ditolak (401 Unauthorized):</b><br>API Key tidak cocok. Pastikan konfigurasi <code>INTERNAL_API_KEY</code> di file .env Anda sama dengan kunci di frontend.`);
+                        appendMessage("error", `<b>Akses Ditolak (401):</b> API Key tidak cocok.`);
                     } else if (response.status === 429) {
-                        appendMessage("error", `<b>Rate Limit Tercapai (429):</b><br>Anda mengirim pesan terlalu cepat. Silakan tunggu beberapa detik sebelum mencoba lagi.`);
+                        appendMessage("error", `<b>Rate Limit (429):</b> Terlalu banyak permintaan.`);
                     } else {
-                        appendMessage("error", `<b>Error (${response.status}):</b><br>${errDetail}`);
+                        appendMessage("error", `<b>Error (${response.status}):</b> ${errDetail}`);
                     }
                 } else {
-                    const data = await response.json();
-                    // Simpan ID response & conversation untuk kelanjutan obrolan stateful
-                    if (data.response_id) activeResponseId = data.response_id;
-                    if (data.conversation_id) activeConversationId = data.conversation_id;
+                    // Read stream chunk by chunk
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder("utf-8");
+                    let fullText = "";
 
-                    // Tampilkan jawaban dari AI
-                    appendMessage("bot", formatText(data.response));
+                    // Create bot message container for streaming text
+                    const botMsgDiv = document.createElement("div");
+                    botMsgDiv.className = "message bot";
+                    botMsgDiv.innerHTML = `
+                        <div class="msg-avatar">👩‍💼</div>
+                        <div class="msg-bubble"></div>
+                    `;
+                    chatMessages.appendChild(botMsgDiv);
+                    const bubble = botMsgDiv.querySelector(".msg-bubble");
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        const chunk = decoder.decode(value, { stream: true });
+                        fullText += chunk;
+                        bubble.innerHTML = formatText(fullText);
+                        scrollToBottom();
+                    }
                 }
 
             } catch (error) {
                 console.error("Fetch error:", error);
                 removeElement(typingId);
-                appendMessage("error", `<b>Gagal Menghubungi Server:</b><br>Pastikan server Uvicorn sedang berjalan di <code>${BASE_URL}</code> dan tidak ada pemblokiran jaringan.`);
+                appendMessage("error", `<b>Gagal Menghubungi Server:</b> Silakan periksa koneksi internet Anda.`);
             } finally {
                 isWaitingResponse = false;
                 sendBtn.disabled = false;

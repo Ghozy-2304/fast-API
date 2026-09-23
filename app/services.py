@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Tuple, Optional, Dict, List
+from typing import Tuple, Optional, Dict, List, AsyncGenerator
 from openai import AsyncOpenAI, APIError, AuthenticationError
 from app.config import settings
 
@@ -45,8 +45,7 @@ class OpenRouterService:
         previous_response_id: Optional[str] = None
     ) -> Tuple[str, str, Optional[str]]:
         """
-        Mengirim pesan menggunakan OpenRouter API.
-        Mempertahankan riwayat obrolan berbasis conversation_id.
+        Mengirim pesan menggunakan OpenRouter API (Non-Streaming).
         """
         try:
             if not conversation_id:
@@ -56,12 +55,10 @@ class OpenRouterService:
 
             history = _conversations_store[conversation_id]
 
-            # Susun pesan system + history + pesan baru
             messages = [{"role": "system", "content": self.instructions}]
             messages.extend(history)
             messages.append({"role": "user", "content": message})
 
-            # Eksekusi request chat completion ke OpenRouter
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=messages
@@ -72,7 +69,6 @@ class OpenRouterService:
 
             output_text = response.choices[0].message.content.strip()
 
-            # Perbarui riwayat di memori
             history.append({"role": "user", "content": message})
             history.append({"role": "assistant", "content": output_text})
             _conversations_store[conversation_id] = history
@@ -90,6 +86,49 @@ class OpenRouterService:
             raise e
         except Exception as e:
             logger.error(f"Error saat komunikasi dengan OpenRouter API: {str(e)}")
+            raise e
+
+    async def chat_with_ai_stream(
+        self,
+        message: str,
+        conversation_id: Optional[str] = None
+    ) -> AsyncGenerator[str, None]:
+        """
+        Mengirim pesan menggunakan OpenRouter API (Streaming kata per kata secara real-time).
+        """
+        try:
+            if not conversation_id:
+                conversation_id = await self.create_conversation()
+            elif conversation_id not in _conversations_store:
+                _conversations_store[conversation_id] = []
+
+            history = _conversations_store[conversation_id]
+
+            messages = [{"role": "system", "content": self.instructions}]
+            messages.extend(history)
+            messages.append({"role": "user", "content": message})
+
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                stream=True
+            )
+
+            collected_chunks = []
+            async for chunk in response:
+                if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    collected_chunks.append(content)
+                    yield content
+
+            full_text = "".join(collected_chunks).strip()
+            if full_text:
+                history.append({"role": "user", "content": message})
+                history.append({"role": "assistant", "content": full_text})
+                _conversations_store[conversation_id] = history
+
+        except Exception as e:
+            logger.error(f"Error saat streaming dari OpenRouter API: {str(e)}")
             raise e
 
 # Dependency provider untuk FastAPI

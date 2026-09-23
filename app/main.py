@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI, HTTPException, status, Depends, Security, Request
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -113,3 +113,24 @@ async def chat_endpoint(
         logger.error(f"Unhandled error in chat endpoint: {str(e)}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Kesalahan pada layanan OpenRouter AI: {str(e)}")
 
+@app.post("/api/v1/chat/stream", tags=["Chat"], dependencies=[Depends(verify_api_key)])
+@limiter.limit("20/minute")
+async def chat_stream_endpoint(
+    request: Request,
+    payload: ChatRequest, 
+    service: OpenRouterService = Depends(get_openrouter_service)
+):
+    """
+    Endpoint streaming berinteraksi dengan AI secara real-time kata per kata.
+    """
+    try:
+        generator = service.chat_with_ai_stream(
+            message=payload.message,
+            conversation_id=payload.conversation_id
+        )
+        return StreamingResponse(generator, media_type="text/plain; charset=utf-8")
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unhandled error in chat stream endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Kesalahan pada layanan OpenRouter AI: {str(e)}")
